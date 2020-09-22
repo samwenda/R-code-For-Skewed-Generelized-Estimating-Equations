@@ -1,0 +1,61 @@
+
+#finding the skewness parameter using stata scobit function
+#scobit fev time weight brestfed male hiv_infected bv##time ,vce(cluster idnum) nrtol(1e-3)
+
+library(geeM)
+library(dplyr)
+
+
+
+modelData <- read.delim("C:/Users/user/Desktop/DataPlosPaper2/longData.txt")
+attach(modelData)
+head(modelData)
+str(modelData)
+##score of sum of number of morbidities in the given month
+out2<-modelData %>% group_by(IDNUM, time) %>% (score_morb=sum(IFEVER,ICOUGH,IDIARHEA,BLOODYLV,VOMIT,IRRITABL,EARINFEC,
+                                                              HEATRASH,IORALULC,ITHRUSH,ISPLENOM,COLD,IPNEUM,GEVOMIT,
+                                                              DEHYDRAT,ICONJUNC,ISEPSIS,ILYMPHAD,STOOLBLD))
+out2
+#output for table 1
+out1<-modelData %>% group_by(time,bv) %>% summarise(morbidities=sum(health_status_bad.))
+out1
+names(modelData)
+
+#models out put using Liang and Zeger GEE, when k=1, then we have the logit
+
+k <- 1
+linkfun <- function(p) {
+  log((p^(1/k))/(1 - p^(1/k)))
+}
+variance <- function(p) {
+  p * (1-p)
+}
+linkinv <- function(eta) {
+  (exp(eta)/(1 + exp(eta)))^k
+}
+mu.eta <- function(eta) {
+  k * (exp(eta))^(k-1) / (1 + exp(eta))^(k+1)
+}
+FunList <- list(linkfun, variance, linkinv, mu.eta)
+
+model_GEE<-geem(health_status_bad.~bv*time+male+BRESTFED+HIV_INFECTED+weight, data =modelData,id=IDNUM,family = FunList,corstr="ar1")
+summary(model_GEE)
+
+#model output for the modified skewed logit. Skweness parameter is estimated using GLM as shown by the stata code.
+k <-  0.9224
+linkfun <- function(p) {
+  log((p^(1/k))/(1 - p^(1/k)))
+}
+variance <- function(p) {
+  p * (1-p)
+}
+linkinv <- function(eta) {
+  (exp(eta)/(1 + exp(eta)))^k
+}
+mu.eta <- function(eta) {
+  k * (exp(eta))^(k-1) / (1 + exp(eta))^(k+1)
+}
+FunList <- list(linkfun, variance, linkinv, mu.eta)
+
+model_SGEE<-geem(health_status_bad.~bv*time+male+BRESTFED+HIV_INFECTED+weight, data =modelData,id=IDNUM,family = FunList,corstr="ar1")
+summary(model_SGEE)
